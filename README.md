@@ -12,7 +12,9 @@ You can view some of the tests run in this folder. Currently you can view the fo
 
 # Code
 The Code directory contains both the minGPT files and the python files needed for the experiments. 
-## The mingpt code used are mainly 3 files.
+
+## The minGPT code
+The code for minGPT are the 3 files listed below. The original code is mostly the same. I use a "#MODIFIED" comment to tag the changes I made.
 - model.py
 - trainer.py
 - utils.py
