@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
     # Plotting squared error vs in-context examples
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, num_samples + 1), mse_list, marker='o', linestyle='-', color='b')
+    plt.plot(range(1, num_samples + 1), mse_list, marker=None, linestyle='-', color='b')
     plt.xlabel('Number of In-Context Examples')
     plt.ylabel('Mean Squared Error')
     plt.title('Mean Squared Error vs. Number of In-Context Examples')
