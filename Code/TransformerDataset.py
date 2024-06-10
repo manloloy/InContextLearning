@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 from FunctionDataset import FunctionDataset
 
 class TransformerTrainDataset(Dataset):
-    def __init__(self, num_samples, input_dim, max_context_size, function_class='linear', noise_std=0.1):
+    def __init__(self, num_samples, input_dim, max_context_size, function_class='linear', noise_std=0.0):
         self.num_samples = num_samples
         self.input_dim = input_dim
         self.max_context_size = max_context_size
@@ -29,21 +29,24 @@ class TransformerTrainDataset(Dataset):
             y_vector = torch.cat((torch.tensor([y]), torch.zeros(self.dimension - 1)))
             inputs.extend([x.tolist(), y_vector.tolist()])
 
+            # Include the target in its correct position with context padding
+            target_vector = torch.zeros(self.dimension)
+            target_vector[0] = y
+            targets.extend([[0.0] * self.dimension, target_vector.tolist()])
+
         # Add the next input (x_{n+1}) with zero as the function value
-        x_next, _ = function_dataset[self.max_context_size]
+        x_next, y_next = function_dataset[self.max_context_size]
         inputs.append(x_next.tolist())
         inputs.append([0.0] * self.dimension)
 
+        # Add the last target value f(x_{n+1})
+        y_vector = torch.cat((torch.tensor([y_next]), torch.zeros(self.dimension - 1)))
+        targets.append([0.0] * self.dimension)
+        targets.append(y_vector.tolist())
+
         # Convert lists to tensors
         inputs = torch.tensor(inputs, dtype=torch.float32).view(-1, self.dimension)
-
-        # Create targets with zero padding
-        targets = torch.zeros((self.max_context_size * 2 + 1, self.dimension), dtype=torch.float32)
-
-        # Place the actual target in the last f(x_i) position
-        _, y_next = function_dataset[self.max_context_size]
-        y_vector = torch.cat((torch.tensor([y_next]), torch.zeros(self.dimension - 1)))
-        targets[-1] = y_vector
+        targets = torch.tensor(targets, dtype=torch.float32).view(-1, self.dimension)
 
         return inputs, targets
 
@@ -55,11 +58,12 @@ class TransformerEvalDataset(Dataset):
         self.dimension = function_dataset[0][0].shape[0]
 
     def __len__(self):
-        return self.max_context_size - 1
+        return self.max_context_size
 
     def __getitem__(self, idx):
         context_size = idx + 1
         inputs = []
+        targets = []
 
         # Collect inputs and targets
         for i in range(context_size):
@@ -67,26 +71,29 @@ class TransformerEvalDataset(Dataset):
             y_vector = torch.cat((torch.tensor([y]), torch.zeros(self.dimension - 1)))
             inputs.extend([x.tolist(), y_vector.tolist()])
 
+            # Include the target in its correct position with context padding
+            target_vector = torch.zeros(self.dimension)
+            target_vector[0] = y
+            targets.extend([[0.0] * self.dimension, target_vector.tolist()])
+
         # Add the next input (x_{n+1}) with zero as the function value
-        x_next, _ = self.function_dataset[context_size]
+        x_next, y_next = self.function_dataset[context_size]
         inputs.append(x_next.tolist())
         inputs.append([0.0] * self.dimension)
 
-        # Pad inputs to the max context size
+        # Add zero target for the next input
+        targets.append([0.0] * self.dimension)
+        y_next_vector = torch.cat((torch.tensor([y_next]), torch.zeros(self.dimension - 1)))
+        targets.append(y_next_vector.tolist())
+
+        # Pad inputs and targets to the max context size
         while len(inputs) < (self.max_context_size * 2):
             inputs.append([0.0] * self.dimension)
+            targets.append([0.0] * self.dimension)
 
         # Convert lists to tensors
         inputs = torch.tensor(inputs[:self.max_context_size * 2], dtype=torch.float32).view(-1, self.dimension)
-
-        # Create targets with zero padding
-        targets = torch.zeros((self.max_context_size * 2, self.dimension), dtype=torch.float32)
-
-        # Place the actual target in the correct f(x_i) position
-        if context_size < len(self.function_dataset):
-            _, y_next = self.function_dataset[context_size]
-            y_vector = torch.cat((torch.tensor([y_next]), torch.zeros(self.dimension - 1)))
-            targets[(context_size+1) * 2 - 1] = y_vector
+        targets = torch.tensor(targets[:self.max_context_size * 2], dtype=torch.float32).view(-1, self.dimension)
 
         return inputs, targets
 
@@ -116,4 +123,3 @@ if __name__ == "__main__":
     for i in range(4):
         inputs, targets = transformer_eval_dataset[i]
         print(f"Sample {i} - Inputs: {inputs.numpy()}, Targets: {targets.numpy()}")
-
